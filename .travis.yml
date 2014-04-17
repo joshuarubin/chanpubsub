@@ -11,5 +11,6 @@ install:
 
 script:
   - export PATH=$HOME/gopath/bin:$PATH
-  - go test -v -covermode=count -coverprofile=profile.cov
+  - go test -v -covermode=count -coverprofile=profile.cov ./...
+  - sed -i "s|github.com/$TRAVIS_REPO_SLUG/||" profile.cov
   - goveralls -v -coverprofile=profile.cov -service=travis-ci
