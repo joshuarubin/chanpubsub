@@ -1,6 +1,6 @@
-# chanpubsub
+# ChanPubSub
 
-Provides a simple to use PubSub implementation using channels
+Provides a simple to use PubSub implementation using channels.
 
 ## Install
 
