@@ -10,6 +10,6 @@ install:
   - go get -v github.com/mattn/goveralls
 
 script:
-  - export PATH=`echo $GOPATH | cut -d: -f1`/bin:$PATH
+  - export PATH=$HOME/gopath/bin:$PATH
   - go test -v -covermode=count -coverprofile=profile.cov
   - goveralls -v -coverprofile=profile.cov -service=travis-ci
