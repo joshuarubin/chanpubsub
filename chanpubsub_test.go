@@ -8,7 +8,7 @@ import (
 )
 
 func TestPubSub(t *testing.T) {
-	Convey("ChanPubSub should be created properly", t, func() {
+	Convey("Should be created properly", t, func() {
 		var p *ChanPubSub
 		So(p, ShouldEqual, nil)
 		p = New()
@@ -17,14 +17,21 @@ func TestPubSub(t *testing.T) {
 		So(p.Size(), ShouldEqual, 0)
 	})
 
-	Convey("ChanPubSub should be able to be stopped", t, func() {
+	Convey("Should not restart if already started", t, func() {
+		p := New()
+		v := p.control
+		p.Start()
+		So(p.control, ShouldEqual, v)
+	})
+
+	Convey("Should be able to be stopped", t, func() {
 		p := New()
 		So(p.control, ShouldNotEqual, nil)
 		<-p.Stop()
 		So(p.control, ShouldEqual, nil)
 	})
 
-	Convey("Subscribers should affect ChanPubSub size", t, func() {
+	Convey("Subscribers should affect size", t, func() {
 		p := New()
 		ch, done := p.Sub()
 		<-done // wait for it...
