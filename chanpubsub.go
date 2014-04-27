@@ -17,28 +17,28 @@ type cmdT struct {
 	ch   chan interface{}
 	rch  <-chan interface{}
 	msg  interface{}
-	done chan<- bool
+	done chan<- struct{}
 }
 
-// The object.
+// ChanPubSub is an object encapsulating publish-subscribe behavior
 type ChanPubSub struct {
 	control chan cmdT
 	subs    []chan interface{}
 }
 
-// Create a new ChanPubSub object and call `Start()` on it.
+// New creates a new ChanPubSub object and calls `Start()` on it.
 func New() *ChanPubSub {
 	return (&ChanPubSub{}).Start()
 }
 
-// Starts the control goroutine that listens for published messages and
+// Start starts the control goroutine that listens for published messages and
 // distributes them to each of the subscribers.
-func (this *ChanPubSub) Start() *ChanPubSub {
-	if this.control != nil {
-		return this
+func (ps *ChanPubSub) Start() *ChanPubSub {
+	if ps.control != nil {
+		return ps
 	}
 
-	this.control = make(chan cmdT, 128)
+	ps.control = make(chan cmdT, 128)
 
 	go func() {
 		var stopCmd *cmdT
@@ -46,26 +46,26 @@ func (this *ChanPubSub) Start() *ChanPubSub {
 	loop:
 		for {
 			select {
-			case cmd := <-this.control:
+			case cmd := <-ps.control:
 				switch cmd.op {
 				case sub:
-					this.subs = append(this.subs, cmd.ch)
-					cmd.done <- true
+					ps.subs = append(ps.subs, cmd.ch)
+					cmd.done <- struct{}{}
 				case unsub:
-					for i, test := range this.subs {
+					for i, test := range ps.subs {
 						if test == cmd.rch {
-							this.subs = append(this.subs[:i], this.subs[i+1:]...)
+							ps.subs = append(ps.subs[:i], ps.subs[i+1:]...)
 							break
 						}
 					}
-					cmd.done <- true
+					cmd.done <- struct{}{}
 				case pub:
-					for _, ch := range this.subs {
+					for _, ch := range ps.subs {
 						ch <- cmd.msg
 					}
-					cmd.done <- true
+					cmd.done <- struct{}{}
 				case size:
-					cmd.ch <- len(this.subs)
+					cmd.ch <- len(ps.subs)
 				case stop:
 					stopCmd = &cmd
 					break loop
@@ -73,21 +73,20 @@ func (this *ChanPubSub) Start() *ChanPubSub {
 			}
 		}
 
-		this.control = nil
-		stopCmd.done <- true
+		ps.control = nil
+		stopCmd.done <- struct{}{}
 	}()
 
-	return this
+	return ps
 }
 
-// Subscribe to all messages.
-// Returns the chan to receive messages.
+// Sub returns a chan that is subscribed to all messages.
 // Also, returns a chan to notify when the command has completed.
-func (this *ChanPubSub) Sub() (<-chan interface{}, <-chan bool) {
+func (ps *ChanPubSub) Sub() (<-chan interface{}, <-chan struct{}) {
 	ch := make(chan interface{}, 128)
-	done := make(chan bool, 1)
+	done := make(chan struct{}, 1)
 
-	this.control <- cmdT{
+	ps.control <- cmdT{
 		op:   sub,
 		ch:   ch,
 		done: done,
@@ -96,13 +95,13 @@ func (this *ChanPubSub) Sub() (<-chan interface{}, <-chan bool) {
 	return ch, done
 }
 
-// Unsubscribe a chan.
+// UnSub unsubscribes a chan from all messages.
 // Often used with `defer`
 // Also, returns a chan to notify when the command has completed.
-func (this *ChanPubSub) UnSub(ch <-chan interface{}) <-chan bool {
-	done := make(chan bool, 1)
+func (ps *ChanPubSub) UnSub(ch <-chan interface{}) <-chan struct{} {
+	done := make(chan struct{}, 1)
 
-	this.control <- cmdT{
+	ps.control <- cmdT{
 		op:   unsub,
 		rch:  ch,
 		done: done,
@@ -111,12 +110,12 @@ func (this *ChanPubSub) UnSub(ch <-chan interface{}) <-chan bool {
 	return done
 }
 
-// Publish a message to all subscribers.
+// Pub publishes a message to all subscribers.
 // Returns a chan to notify when the command has completed.
-func (this *ChanPubSub) Pub(msg interface{}) <-chan bool {
-	done := make(chan bool, 1)
+func (ps *ChanPubSub) Pub(msg interface{}) <-chan struct{} {
+	done := make(chan struct{}, 1)
 
-	this.control <- cmdT{
+	ps.control <- cmdT{
 		op:   pub,
 		msg:  msg,
 		done: done,
@@ -125,11 +124,11 @@ func (this *ChanPubSub) Pub(msg interface{}) <-chan bool {
 	return done
 }
 
-// Returns the number of subscribers. This command is synchronous.
-func (this *ChanPubSub) Size() int {
+// Size returns the number of subscribers. This command is synchronous.
+func (ps *ChanPubSub) Size() int {
 	resp := make(chan interface{})
 
-	this.control <- cmdT{
+	ps.control <- cmdT{
 		op: size,
 		ch: resp,
 	}
@@ -137,12 +136,12 @@ func (this *ChanPubSub) Size() int {
 	return (<-resp).(int)
 }
 
-// Stops the control goroutine that listens for published messages and
+// Stop stops the control goroutine that listens for published messages and
 // distributes them to each of the subscribers.
-func (this *ChanPubSub) Stop() <-chan bool {
-	done := make(chan bool, 1)
+func (ps *ChanPubSub) Stop() <-chan struct{} {
+	done := make(chan struct{}, 1)
 
-	this.control <- cmdT{
+	ps.control <- cmdT{
 		op:   stop,
 		done: done,
 	}
